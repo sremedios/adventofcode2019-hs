@@ -7,14 +7,6 @@ recursiveFuelCalc x
     | otherwise  = 0
     where fuel = fuelCalc x
 
-
-
-indivFuelReq :: [Int] -> [Int]
-indivFuelReq = map fuelCalc
-
-recursiveFuelReq :: [Int] -> [Int]
-recursiveFuelReq = map recursiveFuelCalc
-
 main :: IO()
---main = interact $ show . sum . indivFuelReq . map read . lines
-main = interact $ show . sum . recursiveFuelReq . map read . lines
+--main = interact $ show . sum . map fuelCalc . map read . lines
+main = interact $ show . sum . map recursiveFuelCalc . map read . lines
