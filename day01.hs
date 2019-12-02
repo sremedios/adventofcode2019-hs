@@ -7,6 +7,10 @@ recursiveFuelCalc x
     | otherwise  = 0
     where fuel = fuelCalc x
 
+solve :: [Int] -> String
+solve l = unlines (a:b:[])
+    where a = show $ sum $ map fuelCalc $ l
+          b = show $ sum $ map recursiveFuelCalc $ l
+
 main :: IO()
---main = interact $ show . sum . map fuelCalc . map read . lines
-main = interact $ show . sum . map recursiveFuelCalc . map read . lines
+main = interact $ show . solve . map read . lines
