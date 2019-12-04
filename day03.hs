@@ -5,6 +5,10 @@ data Point = Point { x :: Int
                    , y :: Int
                    } deriving (Show, Eq)
 
+data Seg = Seg { ps   :: [Point]
+               , lens :: [Int]
+               } deriving (Show, Eq)
+
 wordsWhen :: (Char -> Bool) -> String -> [String]
 wordsWhen p s =  case dropWhile p s of
                       "" -> []
@@ -23,83 +27,83 @@ parseDirection s
     where direction = head s
           amt       = read $ tail s
 
-travelPath :: [Point] -> Point -> [Point]
-travelPath start next = start ++ [new_next]
-    where cur_point = last start
+travelPath :: Seg -> Point -> Seg
+travelPath start next = new_seg
+    where cur_point = last $ ps start
           new_next = Point { x = (x cur_point + (x next))
                            , y = (y cur_point + (y next))
                            }
+          new_seg = Seg { ps = ps start ++ [new_next]
+                        , lens = lens start ++ [(last (lens start) + (abs (x next) + abs (y next)))]
+                        }
                            
-accPath :: [Point] -> [Point]
-accPath = flip foldl [Point { x = 0, y = 0 }] travelPath
+accPath :: [Point] -> Seg
+accPath = flip foldl Seg {ps=[Point { x = 0, y = 0 }], lens=[0]} travelPath
 
 inRange :: Int -> Int -> Int -> Bool
 inRange x a b = (a <= x && x <= b) || (b <= x && x <= a)
 
 
-manhattanIntersect :: (Point, Point, Point, Point) -> [Maybe Point]
+manhattanIntersect :: (Point, Point, Point, Point) -> Maybe Point
 manhattanIntersect (p1a, p1b, p2a, p2b)
     -- check perpindicular
-    | checkRangeA = [Just Point { x = (x p1a), y = (y p2b)}]
-    | checkRangeB = [Just Point { x = (x p2a), y = (y p1b)}]
-    -- check colinear on x
-    | x p1a == x p2a || x p1a == x p2b = [Just Point { x = (x p1a)
-                                                     , y = y
-                                                     }
-                                         | y <- [minYP2..maxYP2]
-                                         ]
-    | x p1b == x p2b || x p1a == x p2b = [Just Point { x = (x p1b)
-                                                     , y = y
-                                                     }
-                                         | y <- [minYP2..maxYP2]
-                                         ]
-
-    -- check colinear on y
-    | y p1a == y p2a || y p1a == y p2b = [Just Point { x = x
-                                                     , y = (y p1a)
-                                                     }
-                                         | x <- [minXP2..maxXP2]
-                                         ]
-
-    | y p1b == y p2b || y p1a == y p2b = [Just Point { x = x
-                                                     , y = (y p1b)
-                                                     }
-                                         | x <- [minXP2..maxXP2]
-                                         ]
-
+    | checkRangeA = Just Point { x = (x p1a), y = (y p2b)}
+    | checkRangeB = Just Point { x = (x p2a), y = (y p1b)}
     -- no intersection
-    | otherwise   = [Nothing]
+    | otherwise   = Nothing
     where checkRangeA = inRange (x p1a) (x p2a) (x p2b) && inRange (y p2b) (y p1a) (y p1b)
-          checkRangeB = inRange (x p2a) (x p1a) (x p1b) && inRange (y p1b) (y p1a) (y p1b)
-          minXP2 = min (x p2a) (x p2b)
-          maxXP2 = max (x p2a) (x p2b)
-          minYP2 = min (y p2a) (y p2b)
-          maxYP2 = max (y p2a) (y p2b)
-          minXP1 = min (x p1a) (x p1b)
-          maxXP1 = max (x p1a) (x p1b)
-          minYP1 = min (y p1a) (y p1b)
-          maxYP1 = max (y p1a) (y p1b)
+          checkRangeB = inRange (x p2a) (x p1a) (x p1b) && inRange (y p1b) (y p2a) (y p2b)
 
-shortestManhattanDist :: [Point] -> [Point] -> Int
-shortestManhattanDist xs ys = foldr min (head dists) dists
-    where a = window 2 xs
-          b = window 2 ys
-          z = zip a b
-          intersections = concat $ fmap manhattanIntersect $ fmap (\([a,b],[c,d]) -> (a,b,c,d)) $ z
+shortestManhattanDist :: Seg -> Seg -> Int
+shortestManhattanDist x_seg y_seg = foldr min (head dists) dists
+    where xs = ps x_seg
+          ys = ps y_seg
+          z = [(a, b) | a <- window 2 xs, b <- window 2 ys]
+          intersections = fmap manhattanIntersect $ fmap (\([a,b],[c,d]) -> (a,b,c,d)) z
           legal_inters = filter(\x -> x /= Just Point{x=0,y=0} && x /= Nothing) intersections
           dists = fmap (\p -> (abs $ x p) + (abs $ y p)) $ fmap fromJust legal_inters
 
+shortestSteps :: Seg -> Seg -> Int
+shortestSteps x_seg y_seg = foldr min (head steps) steps
+    where xs = ps x_seg
+          ys = ps y_seg
+          z = [(a, b) | a <- window 2 xs, b <- window 2 ys]
+          intersections = fmap manhattanIntersect $ fmap (\([a,b],[c,d]) -> (a,b,c,d)) z
+          legal_inters = filter(\x -> x /= Just Point{x=0,y=0} && x /= Nothing) intersections
+          x_lens = fmap lens $ fmap (\x -> travelPath x_seg x) $ fmap fromJust legal_inters
+          y_lens = fmap lens $ fmap (\y -> travelPath y_seg y) $ fmap fromJust legal_inters
+          steps = fmap (\pair -> fst pair + snd pair) $ zip (last x_lens) (last y_lens)
 
 solveP1 :: [String] -> Int
 solveP1 l = shortestManhattanDist a b
     where a = accPath $ fmap parseDirection $ wordsWhen (==',') $ head l
           b = accPath $ fmap parseDirection $ wordsWhen (==',') $ last l
+
+solveP2 :: [String] -> Int
+solveP2 l = shortestSteps a b
+    where a = accPath $ fmap parseDirection $ wordsWhen (==',') $ head l
+          b = accPath $ fmap parseDirection $ wordsWhen (==',') $ last l
+
+test :: [String] -> [Seg ]
+test l = test' a b
+    where a = accPath $ fmap parseDirection $ wordsWhen (==',') $ head l
+          b = accPath $ fmap parseDirection $ wordsWhen (==',') $ last l
+
+test' :: Seg -> Seg -> [Seg]
+test' x_seg y_seg = t
+    where xs = ps x_seg
+          ys = ps y_seg
+          z = [(a, b) | a <- window 2 xs, b <- window 2 ys]
+          intersections = fmap manhattanIntersect $ fmap (\([a,b],[c,d]) -> (a,b,c,d)) z
+          legal_inters = filter(\x -> x /= Just Point{x=0,y=0} && x /= Nothing) intersections
+          x_lens = fmap lens $ fmap (\x -> travelPath x_seg x) $ fmap fromJust legal_inters
+          t = fmap (\x -> travelPath x_seg x) $ fmap fromJust legal_inters
              
 
 solve :: [String] -> String
 solve s = unlines (a:b:[])
     where a = "Part 1: " ++ (show $ solveP1 s)
-          b = "Part 2: TODO" -- ++ (show $ solveP2 p)
+          b = "Part 2: TODO" -- ++ (show $ solveP2 s)
 
 main :: IO()
 main = interact $ solve . lines
