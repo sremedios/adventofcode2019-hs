@@ -44,13 +44,13 @@ inRange :: Int -> Int -> Int -> Bool
 inRange x a b = (a <= x && x <= b) || (b <= x && x <= a)
 
 
-manhattanIntersect :: (Point, Point, Point, Point) -> Maybe Point
+manhattanIntersect :: (Point, Point, Point, Point) -> [Maybe Point]
 manhattanIntersect (p1a, p1b, p2a, p2b)
     -- check perpindicular
-    | checkRangeA = Just Point { x = (x p1a), y = (y p2b)}
-    | checkRangeB = Just Point { x = (x p2a), y = (y p1b)}
+    | checkRangeA = fmap Just [Point { x = (x p1a), y = (y p2b)}, p1a, p1b, p2a, p2b]
+    | checkRangeB = fmap Just [Point { x = (x p2a), y = (y p1b)}, p1a, p1b, p2a, p2b]
     -- no intersection
-    | otherwise   = Nothing
+    | otherwise   = [Nothing]
     where checkRangeA = inRange (x p1a) (x p2a) (x p2b) && inRange (y p2b) (y p1a) (y p1b)
           checkRangeB = inRange (x p2a) (x p1a) (x p1b) && inRange (y p1b) (y p2a) (y p2b)
 
@@ -60,19 +60,23 @@ shortestManhattanDist x_seg y_seg = foldr min (head dists) dists
           ys = ps y_seg
           z = [(a, b) | a <- window 2 xs, b <- window 2 ys]
           intersections = fmap manhattanIntersect $ fmap (\([a,b],[c,d]) -> (a,b,c,d)) z
-          legal_inters = filter(\x -> x /= Just Point{x=0,y=0} && x /= Nothing) intersections
-          dists = fmap (\p -> (abs $ x p) + (abs $ y p)) $ fmap fromJust legal_inters
+          legal_inters = filter(\x -> head x /= Just Point{x=0,y=0} 
+                                   && head x /= Nothing) intersections
+          dists = fmap (\p -> (abs $ x p) + (abs $ y p)) $ fmap fromJust $ fmap head legal_inters
 
+-- TODO: need to takeWhile to truncate xs and ys, then reappend the intersection point
+-- then sum lengths
 shortestSteps :: Seg -> Seg -> Int
-shortestSteps x_seg y_seg = foldr min (head steps) steps
+shortestSteps x_seg y_seg = x_lens
     where xs = ps x_seg
           ys = ps y_seg
           z = [(a, b) | a <- window 2 xs, b <- window 2 ys]
           intersections = fmap manhattanIntersect $ fmap (\([a,b],[c,d]) -> (a,b,c,d)) z
-          legal_inters = filter(\x -> x /= Just Point{x=0,y=0} && x /= Nothing) intersections
-          x_lens = fmap lens $ fmap (\x -> travelPath x_seg x) $ fmap fromJust legal_inters
-          y_lens = fmap lens $ fmap (\y -> travelPath y_seg y) $ fmap fromJust legal_inters
-          steps = fmap (\pair -> fst pair + snd pair) $ zip (last x_lens) (last y_lens)
+          legal_inters = filter(\x -> head x /= Just Point{x=0,y=0} 
+                                   && head x /= Nothing) intersections
+          prev_pts = fmap tail legal_inters
+          inters = fmap head legal_inters
+          x_lens = fmap lens $ fmap (\x -> travelPath x_seg x) $ fmap fromJust inters
 
 solveP1 :: [String] -> Int
 solveP1 l = shortestManhattanDist a b
@@ -84,20 +88,6 @@ solveP2 l = shortestSteps a b
     where a = accPath $ fmap parseDirection $ wordsWhen (==',') $ head l
           b = accPath $ fmap parseDirection $ wordsWhen (==',') $ last l
 
-test :: [String] -> [Seg ]
-test l = test' a b
-    where a = accPath $ fmap parseDirection $ wordsWhen (==',') $ head l
-          b = accPath $ fmap parseDirection $ wordsWhen (==',') $ last l
-
-test' :: Seg -> Seg -> [Seg]
-test' x_seg y_seg = t
-    where xs = ps x_seg
-          ys = ps y_seg
-          z = [(a, b) | a <- window 2 xs, b <- window 2 ys]
-          intersections = fmap manhattanIntersect $ fmap (\([a,b],[c,d]) -> (a,b,c,d)) z
-          legal_inters = filter(\x -> x /= Just Point{x=0,y=0} && x /= Nothing) intersections
-          x_lens = fmap lens $ fmap (\x -> travelPath x_seg x) $ fmap fromJust legal_inters
-          t = fmap (\x -> travelPath x_seg x) $ fmap fromJust legal_inters
              
 
 solve :: [String] -> String
