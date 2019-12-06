@@ -1,12 +1,13 @@
 data Program = Program { instruction_pointer  :: Int
                        , memory               :: [Int]
+                       , prev_op              :: Operation
                        , current_input        :: Int
                        , current_output       :: Int
                        } deriving Show
 
 data Mode = Immediate | Position | Write deriving Show                       
 
-data Operation = Add | Mul | Inp | Out | Halt deriving Show
+data Operation = Add | Mul | Inp | Out | Halt | Start deriving Show
 
 data Instruction = Instruction { op :: Operation
                                , param_1 :: Mode 
@@ -29,6 +30,7 @@ readCode :: Int -> String -> Program
 readCode input_value s = Program { instruction_pointer = 0
                                  , memory = map read $ wordsWhen (==',') s
                                  , current_input = input_value
+                                 , prev_op = Start
                                  , current_output = 0 
                                  }
 
@@ -75,10 +77,14 @@ parseArg p arg_num m = case m of
 
 executeInstruction :: Program -> Program 
 executeInstruction p = Program { instruction_pointer = cur_idx + num_params instr
-                                , memory = new_memory
-                                , current_input = current_input p
-                                , current_output = memory p !! arg_1
-                                }
+                               , memory = new_memory
+                               , current_input = current_input p
+                               , prev_op = op instr
+                               , current_output = case op instr of
+                                                       Out -> memory p !! write_idx
+                                                       Halt -> current_output p
+                                                       otherwise -> current_input p
+                               }
 
     where cur_idx = instruction_pointer p
           opcode = parseOpcode $ memory p !! cur_idx
@@ -86,59 +92,32 @@ executeInstruction p = Program { instruction_pointer = cur_idx + num_params inst
           arg_1 = parseArg p 1 $ param_1 instr
           arg_2 = parseArg p 2 $ param_2 instr
           arg_3 = parseArg p 3 $ param_3 instr
+          write_idx = memory p !! (cur_idx + 1)
           new_memory = case op instr of
                             Add  -> updateList arg_3 (arg_1 + arg_2) $ memory p
                             Mul  -> updateList arg_3 (arg_1 * arg_2) $ memory p
-                            Inp  -> updateList arg_1 (current_input p) $ memory p
+                            Inp  -> updateList write_idx (current_input p) $ memory p
                             Out  -> memory p
                             Halt -> memory p
 
 
+execute :: Program -> Program
+execute p = case prev_op p of
+                Halt -> p
+                otherwise -> execute $ executeInstruction p
 
-{-
-execute :: Int -> Program -> Program
-execute user_input p 
-    | opcode == 1   = execute user_input $ new_p 2 $ arithmetic_instruction (+)
-    | opcode == 2   = execute user_input $ new_p 2 $ arithmetic_instruction (*)
-    | opcode == 3   = execute user_input $ new_p 1 $ input_instruction
-    | opcode == 4   = execute user_input $ new_p 1 $ memory p
-    | opcode == 99  = p
-    | otherwise     = undefined
-    where opcode = memory p !! instruction_pointer p
-          param_1_idx = memory p !! (instruction_pointer p + 1)
-          param_2_idx = memory p !! (instruction_pointer p + 2)
-          param_3_idx = memory p !! (instruction_pointer p + 3)
-          a = memory p !! param_1_idx
-          b = memory p !! param_2_idx
-          next_idx num_params = instruction_pointer p + num_params
-          arithmetic_instruction op = updateList param_3_idx ((op) a b) $ memory p
-          input_instruction = updateList param_1_idx user_input $ memory p
-          new_p num_params memory = Program { instruction_pointer = next_idx num_params
-                                            , memory = memory 
-                                            }
-solveP1 :: Program -> Int
-solveP1 p = instruction p !! 0
 
-solveP2' :: [(Int, Int)] -> Program -> [(Int, Int)]
-solveP2' options p
-    | result == 19690720 = [(noun, verb)]
-    | otherwise          = solveP2' (tail options) p
-    where result = solveP1 $ execute $ initProgram noun verb p
-          noun = fst $ head options
-          verb = snd $ head options
+solveP1 :: String -> Int
+solveP1 s = current_output $ execute $ readCode 1 s
 
-solveP2 :: Program -> Int
-solveP2 p = 100 * noun + verb
-    where x = solveP2' [(n, v) | n <- [0..99], v <- [0..99]] p
-          noun = fst $ head x
-          verb = snd $ head x
+solveP2 :: [(Int, Int)] -> Program -> [(Int, Int)]
+solveP2 = undefined
     
 
-solve :: Program -> String
-solve p = unlines (a:b:[])
-    where a = "Part 1: " ++ (show $ solveP1 $ execute $ initProgram 12 2 p)
-          b = "Part 2: " ++ (show $ solveP2 p)
+solve :: String -> String
+solve input_string = unlines (a:b:[])
+    where a = "Part 1: " ++ (show . solveP1) input_string
+          b = "Part 2: TODO" -- ++ (show $ solveP2 p)
 
--}
 main :: IO()
-main = undefined -- interact $ solve . readCode
+main = interact $ solve
