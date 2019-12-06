@@ -60,14 +60,34 @@ countOrbits m
     | untraversed m == [] = m
     | otherwise = countOrbits $ foldl countOrbits' m $ untraversed m
 
+makePath' :: FoldableOrbit -> String -> String
+makePath' m s = fst $ head $ filter (\(k, v) -> elem s v) $ Map.assocs $ orbitMap m
+
+makePath :: FoldableOrbit -> [String] -> [String]
+makePath m s 
+    | head s == "COM"   = s
+    | otherwise         = makePath m new_path
+    where new_path = [makePath' m $ head s] ++ s
+
+orbitalTransfer :: String -> String -> FoldableOrbit -> Int
+orbitalTransfer src dst m = length $ path_x ++ path_y
+    where x = makePath m [src]
+          y = makePath m [dst]
+          common_ancestor = snd $ last $ filter (\(a,b) -> a == b) $ zip x y
+          path_x = init $ tail $ dropWhile (/=common_ancestor) x
+          path_y = init $ tail $ dropWhile (/=common_ancestor) y
+
 
 solveP1 :: String -> Int
 solveP1 = sum . Map.elems . numberOrbits . countOrbits . readInput
 
+solveP2 :: String -> Int
+solveP2  = orbitalTransfer "YOU" "SAN" . readInput
+
 solve :: String -> String
 solve s = unlines (a:b:[])
     where a = "Part 1: " ++ (show $ solveP1 s)
-          b = "Part 2: TODO"
+          b = "Part 2: " ++ (show $ solveP2 s)
 
 
 main :: IO()
